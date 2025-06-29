@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "599838805787",
+    "project_id": "mobil-uygulamam-ae5ca",
+    "storage_bucket": "mobil-uygulamam-ae5ca.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:599838805787:android:f2d6f51a55fdc12546cdbe",
+        "android_client_info": {
+          "package_name": "com.example.vokal_koc_uygulamasi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCAlUyMCkZcUY2tiYrkb-tE2rMZLhleeLY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
