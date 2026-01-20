@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'profile_page.dart';
-import 'login_page.dart';
+import 'package:country_flags/country_flags.dart';
 import 'recorder_page.dart';
 import 'recordings_page.dart';
+import 'localization_manager.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,19 +14,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
+      duration: const Duration(seconds: 2),
       vsync: this,
-      duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
-    _animation = Tween<double>(begin: 8, end: 24).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
   }
 
   @override
@@ -36,18 +30,70 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
-  Widget _buildWaveBar(double height, int delay) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (_, __) {
-        final scale = (height + (_animation.value * (1 - (delay * 0.2)))).clamp(8.0, 32.0);
-        return Container(
-          width: 6,
-          height: scale,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(
-            color: Colors.deepPurple,
-            borderRadius: BorderRadius.circular(4),
+  void _showLanguagePanel() {
+    final localization = LocalizationManager();
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: const Color(0xFF1D1E33),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            width: 320,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  localization.translate('select_language'),
+                  style: GoogleFonts.orbitron(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 400, // Limit height
+                  child: ListView.separated(
+                    itemCount: localization.supportedLanguages.length,
+                    separatorBuilder: (_, __) => Divider(color: Colors.white.withOpacity(0.1)),
+                    itemBuilder: (context, index) {
+                      String code = localization.supportedLanguages.keys.elementAt(index);
+                      String name = localization.supportedLanguages[code]!;
+                      String flagCode = localization.languageFlags[code]!;
+
+                      return ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: CountryFlag.fromCountryCode(
+                            flagCode,
+                            height: 32,
+                            width: 48,
+                          ),
+                        ),
+                        title: Text(
+                          name,
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: code == localization.languageCode ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: code == localization.languageCode
+                          ? const Icon(Icons.check_circle, color: Color(0xFF00E5FF))
+                          : null,
+                        onTap: () {
+                          localization.setLanguage(code);
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -56,210 +102,223 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final email = user?.email ?? "Kullanıcı";
+    final colorScheme = Theme.of(context).colorScheme;
+    final localization = LocalizationManager();
 
     return WillPopScope(
       onWillPop: () async => false,
       child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          backgroundColor: Colors.deepPurple,
-          title: Text(
-            "Vokal Koç",
-            style: GoogleFonts.poppins(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.topCenter,
+              radius: 1.5,
+              colors: [
+                Color(0xFF1F2633), // Soft spotlight
+                Color(0xFF070B14), // Deep void
+              ],
             ),
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.person, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfilePage()),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white),
-              onPressed: () async {
-                await FirebaseAuth.instance.signOut();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                      (Route<dynamic> route) => false,
-                );
-              },
-            ),
-          ],
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+          child: SafeArea(
+            child: Stack(
               children: [
-                /// 🟣 Karşılama Kartı
-                Card(
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  color: Colors.deepPurple.shade50,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
-                    child: Row(
-                      children: [
-                        const CircleAvatar(
-                          radius: 30,
-                          backgroundColor: Colors.deepPurple,
-                          child: Icon(Icons.person, color: Colors.white, size: 30),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Hoş geldin,",
-                                style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.deepPurple.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                email,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.deepPurple.shade700,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-
-                /// ✨ Tanıtım Kutusu (Yeni)
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.deepPurple.shade400, Colors.purpleAccent.shade100],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.deepPurple.withOpacity(0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        "✨Sesinizi kaydedin✨",
-                        style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                      const Spacer(),
+                      
+                      // 1. High-Quality Visual (Glowing Icon)
+                      Container(
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.primary.withOpacity(0.2),
+                              blurRadius: 50,
+                              spreadRadius: 10,
+                            )
+                          ],
+                          border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
                         ),
+                        child: Icon(
+                          Icons.mic_none_outlined, 
+                          size: 64, 
+                          color: colorScheme.primary
+                        ),
+                      ),
+            
+                      const SizedBox(height: 48),
+            
+                      // 2. Title
+                      Text(
+                        localization.translate('app_title'),
                         textAlign: TextAlign.center,
+                        style: GoogleFonts.orbitron(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 4.0,
+                          color: Colors.white,
+                          shadows: [
+                            BoxShadow(
+                              color: colorScheme.primary.withOpacity(0.5),
+                              blurRadius: 20,
+                            )
+                          ]
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        "✨Hangi vokal türüne✨ ✨sahip olduğunuzu✨ ✨keşfedin!✨",
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.95),
+                        localization.translate('subtitle'),
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          color: Colors.white54,
+                          letterSpacing: 2.0,
                         ),
-                        textAlign: TextAlign.center,
                       ),
+            
+                      const Spacer(),
+            
+                      // 3. Simple Buttons
+                      // Button 1: Start Analysis
+                      _buildMainButton(
+                        context,
+                        label: localization.translate('start_analysis'),
+                        icon: Icons.graphic_eq,
+                        color: colorScheme.primary,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const RecorderPage()),
+                          );
+                        },
+                      ),
+            
+                      const SizedBox(height: 20),
+            
+                      // Button 2: Recording Log
+                      _buildSecondaryButton(
+                        context,
+                        label: localization.translate('record_book'),
+                        icon: Icons.history_rounded,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const RecordingsPage()),
+                          );
+                        },
+                      ),
+                      
+                      const SizedBox(height: 48),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 16),
-
-                /// 🔊 Ses Dalgası Animasyonu
-                SizedBox(
-                  height: 40,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildWaveBar(12, 0),
-                      _buildWaveBar(16, 1),
-                      _buildWaveBar(24, 2),
-                      _buildWaveBar(16, 1),
-                      _buildWaveBar(12, 0),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                /// 🎤 Ses Kaydet Butonu
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.mic),
-                  label: const Text("Ses Kaydet"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                // Language Settings Button
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: GestureDetector(
+                    onTap: _showLanguagePanel,
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1D1E33), // Solid dark color (doughnut-like)
+                        shape: BoxShape.circle,
+                        border: Border.all(color: colorScheme.primary.withOpacity(0.5), width: 2),
+                        boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.primary.withOpacity(0.3),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                            )
+                        ]
+                      ),
+                      child: ClipOval(
+                        child: Padding(
+                          padding: const EdgeInsets.all(0), // Removed padding to fill the circle
+                          child: CountryFlag.fromCountryCode(
+                            localization.languageFlags[localization.languageCode]!,
+                            height: 56,
+                            width: 56, 
+                          ),
+                        ),
+                      ),
                     ),
-                    textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
                   ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const RecorderPage()),
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                /// 🎵 Kayıtları Görüntüle Butonu
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.library_music),
-                  label: const Text("Kayıtları Görüntüle"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const RecordingsPage()),
-                    );
-                  },
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainButton(BuildContext context, {required String label, required IconData icon, required Color color, required VoidCallback onTap}) {
+    return SizedBox(
+      width: double.infinity,
+      height: 64,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.black,
+          elevation: 10,
+          shadowColor: color.withOpacity(0.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        ),
+        onPressed: onTap,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: GoogleFonts.orbitron(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecondaryButton(BuildContext context, {required String label, required IconData icon, required VoidCallback onTap}) {
+    return SizedBox(
+      width: double.infinity,
+      height: 64,
+      child: OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white,
+          side: BorderSide(color: Colors.white.withOpacity(0.1), width: 2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        ),
+        onPressed: onTap,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 24, color: Colors.white70),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.5,
+                color: Colors.white,
+              ),
+            ),
+          ],
         ),
       ),
     );

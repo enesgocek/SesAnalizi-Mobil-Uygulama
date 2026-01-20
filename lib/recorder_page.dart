@@ -1,12 +1,12 @@
+import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'recordings_page.dart';
+import 'localization_manager.dart';
 
 class RecorderPage extends StatefulWidget {
   const RecorderPage({super.key});
@@ -15,7 +15,7 @@ class RecorderPage extends StatefulWidget {
   State<RecorderPage> createState() => _RecorderPageState();
 }
 
-class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver {
+class _RecorderPageState extends State<RecorderPage> {
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   bool _isRecording = false;
   String? _recordedFilePath;
@@ -26,57 +26,25 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   void initState() {
     super.initState();
     _initRecorder();
-    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _timer?.cancel();
+    if (_recorder.isRecording) {
+      _recorder.stopRecorder();
+    }
     _recorder.closeRecorder();
+    _timer?.cancel();
     super.dispose();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _checkAndRequestMicPermission();
-  }
-
   Future<void> _initRecorder() async {
-    await _recorder.openRecorder();
-  }
-
-  Future<bool> _checkAndRequestMicPermission() async {
+    // Permission request moved to start recording or initial check
     final status = await Permission.microphone.status;
-
-    if (status.isGranted) return true;
-
-    if (status.isPermanentlyDenied) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Mikrofon izni kalıcı olarak reddedildi. Ayarlardan izin verin."),
-          action: SnackBarAction(
-            label: 'Aç',
-            onPressed: () {
-              openAppSettings();
-            },
-          ),
-        ),
-      );
-      return false;
+    if (!status.isGranted) {
+      await Permission.microphone.request();
     }
-
-    final result = await Permission.microphone.request();
-
-    if (!result.isGranted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Mikrofon izni gerekli!")),
-      );
-      return false;
-    }
-
-    return true;
+    await _recorder.openRecorder();
   }
 
   String _formatDuration(int seconds) {
@@ -86,25 +54,28 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   }
 
   Future<void> _startRecording() async {
-    final hasPermission = await _checkAndRequestMicPermission();
-    if (!hasPermission) return;
+    final localization = LocalizationManager();
+    final status = await Permission.microphone.request();
+    if (!mounted) return;
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Giriş yapılmadan kayıt yapılamaz.")),
+    if (!status.isGranted) {
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Microphone permission required")),
       );
       return;
     }
 
     Directory baseDir = await getApplicationDocumentsDirectory();
-    String userDirPath = '${baseDir.path}/${user.uid}';
-    Directory userDir = Directory(userDirPath);
-    if (!await userDir.exists()) {
-      await userDir.create(recursive: true);
+    // Using a common folder instead of user-specific
+    String recordingsPath = '${baseDir.path}/recordings';
+    Directory recordingsDir = Directory(recordingsPath);
+    if (!await recordingsDir.exists()) {
+      await recordingsDir.create(recursive: true);
     }
 
-    String filePath = '$userDirPath/recording_${DateTime.now().millisecondsSinceEpoch}.aac';
+    // Name: YYYY-MM-DD HH-mm-ss.aac
+    String timestamp = DateTime.now().toString().split('.')[0].replaceAll(':', '-');
+    String filePath = '$recordingsPath/$timestamp.aac';
 
     await _recorder.startRecorder(
       toFile: filePath,
@@ -124,8 +95,11 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   }
 
   Future<void> _stopRecording() async {
+    final localization = LocalizationManager();
     await _recorder.stopRecorder();
     _timer?.cancel();
+
+    if (!mounted) return;
 
     setState(() {
       _isRecording = false;
@@ -143,8 +117,8 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Kayıt başarıyla kaydedildi',
-                style: GoogleFonts.poppins(color: Colors.white),
+                localization.translate('recording_stopped'),
+                style: GoogleFonts.robotoMono(color: Colors.white),
               ),
             ),
           ],
@@ -156,94 +130,171 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final localization = LocalizationManager();
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.black, // Dark background
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.deepPurple,
         title: Text(
-          'Ses Kaydedici',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
-            fontSize: 22,
+          'STUDIO REC',
+          style: GoogleFonts.orbitron(
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2.0,
+            fontSize: 20,
             color: Colors.white,
           ),
         ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                height: 120,
-                width: 120,
-                decoration: BoxDecoration(
-                  color: _isRecording ? Colors.redAccent : Colors.deepPurple.shade100,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _isRecording ? Colors.red.withOpacity(0.4) : Colors.deepPurple.withOpacity(0.2),
-                      blurRadius: 20,
-                      spreadRadius: 5,
-                    )
+      body: Container(
+         decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.center,
+              radius: 1.2,
+              colors: [
+                const Color(0xFF1E2336), 
+                colorScheme.background,
+              ],
+            ),
+          ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Timer Display with Neon Glow
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _isRecording ? colorScheme.error : colorScheme.primary.withOpacity(0.3), width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (_isRecording ? colorScheme.error : colorScheme.primary).withOpacity(0.2),
+                        blurRadius: 20,
+                        spreadRadius: 1,
+                      )
+                    ],
+                  ),
+                  child: Text(
+                    _isRecording ? _formatDuration(_recordDuration) : "00:00",
+                    style: GoogleFonts.robotoMono( 
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 2.0,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  _isRecording ? localization.translate('recording_started') : localization.translate('tap_to_record'),
+                  style: GoogleFonts.orbitron(
+                    color: _isRecording ? colorScheme.error : Colors.white54,
+                    fontSize: 14,
+                    letterSpacing: 2.0,
+                  ),
+                ),
+
+                const SizedBox(height: 80),
+
+                // Studio Mic Button (Glowing Orb)
+                GestureDetector(
+                  onTap: _isRecording ? _stopRecording : _startRecording,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    height: _isRecording ? 180 : 160,
+                    width: _isRecording ? 180 : 160,
+                    decoration: BoxDecoration(
+                      color: _isRecording ? colorScheme.error.withOpacity(0.1) : colorScheme.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _isRecording ? colorScheme.error : colorScheme.primary,
+                        width: 4,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (_isRecording ? colorScheme.error : colorScheme.primary)
+                              .withOpacity(_isRecording ? 0.6 : 0.4),
+                          blurRadius: _isRecording ? 50 : 30,
+                          spreadRadius: _isRecording ? 10 : 2,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Container(
+                        height: 80,
+                        width: 80,
+                         decoration: BoxDecoration(
+                          color: _isRecording ? colorScheme.error : colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                          size: 40,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 80),
+
+                // Bottom Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildOptionButton(
+                      context,
+                      icon: Icons.list_rounded,
+                      label: localization.translate('record_book'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const RecordingsPage()),
+                        );
+                      },
+                    ),
                   ],
                 ),
-                child: Icon(
-                  _isRecording ? Icons.mic : Icons.mic_none,
-                  size: 60,
-                  color: _isRecording ? Colors.white : Colors.deepPurple,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                _isRecording ? _formatDuration(_recordDuration) : "Hazır",
-                style: GoogleFonts.poppins(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w500,
-                  color: _isRecording ? Colors.redAccent : Colors.black54,
-                ),
-              ),
-              const SizedBox(height: 40),
-              ElevatedButton.icon(
-                icon: Icon(_isRecording ? Icons.stop : Icons.fiber_manual_record),
-                label: Text(_isRecording ? 'Kaydı Durdur' : 'Kayda Başla'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isRecording ? Colors.redAccent : Colors.deepPurple,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                  textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  elevation: 4,
-                ),
-                onPressed: _isRecording ? _stopRecording : _startRecording,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const RecordingsPage()),
-                  );
-                },
-                icon: const Icon(Icons.library_music),
-                label: const Text("Kayıtlarım"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple.shade400,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  textStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOptionButton(BuildContext context, {required IconData icon, required String label, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(30),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
         ),
       ),
     );
