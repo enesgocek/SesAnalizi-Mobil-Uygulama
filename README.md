@@ -1,9 +1,9 @@
 # Vocal Coach Studio 🎙️
 
 A professional vocal analysis application built with **Flutter** (Frontend) and **Python/Flask** (Backend). This app helps users analyze their voice pitch, determine their voice type (e.g., Soprano, Tenor), and visualize their vocal range.
-
-<img src="images/Screenshot_20260121_130702.png" alt="Vocal Coach app pic" width="30%">
-
+<div align="center">
+  <img src="images/Screenshot_20260121_130702.png" alt="Vocal Coach app pic" width="30%">
+</div>
 ## ✨ Features
 
 *   **Real-time Pitch Analysis**: Visualizes pitch frequency and stability.
