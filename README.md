@@ -2,7 +2,7 @@
 
 A professional vocal analysis application built with **Flutter** (Frontend) and **Python/Flask** (Backend). This app helps users analyze their voice pitch, determine their voice type (e.g., Soprano, Tenor), and visualize their vocal range.
 
-![App Screenshot](https://via.placeholder.com/800x400.png?text=Vocal+Coach+Studio+Preview)
+![App Screenshot](images/Screenshot_20260121_130702.png)
 
 ## ✨ Features
 
